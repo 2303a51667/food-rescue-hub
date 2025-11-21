@@ -37,20 +37,26 @@ const Chat = () => {
       fetchMessages();
       fetchOtherUserName();
       
-      // Subscribe to new messages
+      // Subscribe to new messages (bidirectional)
       const channel = supabase
-        .channel('messages')
+        .channel('messages-chat')
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
-            table: 'messages',
-            filter: `sender_id=eq.${userId},receiver_id=eq.${currentUserId}`,
+            table: 'messages'
           },
           (payload) => {
-            setMessages(prev => [...prev, payload.new as Message]);
-            scrollToBottom();
+            const newMsg = payload.new as Message;
+            // Only add if it's between current user and the chat partner
+            if (
+              (newMsg.sender_id === currentUserId && newMsg.receiver_id === userId) ||
+              (newMsg.sender_id === userId && newMsg.receiver_id === currentUserId)
+            ) {
+              setMessages(prev => [...prev, newMsg]);
+              scrollToBottom();
+            }
           }
         )
         .subscribe();

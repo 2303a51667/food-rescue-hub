@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher, useLanguage } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import NotificationsCenter from "@/components/NotificationsCenter";
 
 interface UserProfile {
   meals_shared: number;
@@ -83,6 +84,62 @@ const Dashboard = () => {
 
       if (listingsError) throw listingsError;
       setRecentListings(listingsData || []);
+
+      // Set up real-time subscription for user's listings
+      const listingsChannel = supabase
+        .channel('user-listings-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'food_listings',
+            filter: `donor_id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('User listing changed:', payload);
+            
+            if (payload.eventType === 'INSERT') {
+              setRecentListings(prev => [payload.new as FoodListing, ...prev].slice(0, 5));
+            } else if (payload.eventType === 'UPDATE') {
+              setRecentListings(prev => 
+                prev.map(l => l.id === payload.new.id ? payload.new as FoodListing : l)
+              );
+            } else if (payload.eventType === 'DELETE') {
+              setRecentListings(prev => prev.filter(l => l.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+      // Set up real-time subscription for profile changes
+      const profileChannel = supabase
+        .channel('user-profile-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Profile updated:', payload);
+            const newProfile = payload.new as any;
+            setProfile({
+              meals_shared: newProfile.meals_shared,
+              meals_received: newProfile.meals_received,
+              co2_saved: newProfile.co2_saved
+            });
+          }
+        )
+        .subscribe();
+
+      // Clean up subscriptions
+      return () => {
+        supabase.removeChannel(listingsChannel);
+        supabase.removeChannel(profileChannel);
+      };
     } catch (error: any) {
       toast({
         title: "Error",
@@ -156,6 +213,7 @@ const Dashboard = () => {
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <LanguageSwitcher language={language} setLanguage={setLanguage} />
+            <NotificationsCenter />
             <Button variant="ghost" size="sm" onClick={() => navigate("/community")}>
               <TrendingUp className="h-4 w-4 mr-2" />
               Community

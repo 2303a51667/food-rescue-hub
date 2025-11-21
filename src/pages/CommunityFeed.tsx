@@ -42,6 +42,28 @@ const CommunityFeed = () => {
 
   useEffect(() => {
     fetchData();
+
+    // Set up real-time subscription for community activities
+    const channel = supabase
+      .channel('community-activities-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'community_activities'
+        },
+        (payload) => {
+          console.log('New community activity:', payload);
+          // Refresh the feed to show new activity
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchData = async () => {
