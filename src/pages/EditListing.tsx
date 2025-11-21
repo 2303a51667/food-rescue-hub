@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,29 +26,79 @@ const listingSchema = z.object({
   available_from: z.date({ required_error: "Pickup time is required" }),
 });
 
-const CreateListing = () => {
+const EditListing = () => {
+  const { id } = useParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [pickupDate, setPickupDate] = useState<Date>();
   const [expiryDate, setExpiryDate] = useState<Date>();
   const [category, setCategory] = useState<string>("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
   const [contactlessPickup, setContactlessPickup] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndFetch = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         navigate("/auth");
         return;
       }
       setUserId(session.user.id);
+      await fetchListing(session.user.id);
     };
-    checkAuth();
-  }, [navigate]);
+    checkAuthAndFetch();
+  }, [id, navigate]);
+
+  const fetchListing = async (currentUserId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("food_listings")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+
+      if (data.donor_id !== currentUserId) {
+        toast({
+          title: "Unauthorized",
+          description: "You can only edit your own listings",
+          variant: "destructive",
+        });
+        navigate("/dashboard");
+        return;
+      }
+
+      setTitle(data.title);
+      setDescription(data.description);
+      setCategory(data.category);
+      setQuantity(data.quantity);
+      setPickupLocation(data.pickup_location);
+      setPickupDate(new Date(data.available_from));
+      setExpiryDate(new Date(data.available_until));
+      setContactlessPickup(data.contactless_pickup || false);
+      if (data.image_url) {
+        setImagePreview(data.image_url);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load listing",
+        variant: "destructive",
+      });
+      navigate("/dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,24 +129,21 @@ const CreateListing = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const formData = new FormData(e.currentTarget);
     const data = {
-      title: formData.get("title") as string,
-      description: formData.get("description") as string,
-      category: category,
-      quantity: formData.get("quantity") as string,
-      pickup_location: formData.get("pickup_location") as string,
+      title,
+      description,
+      category,
+      quantity,
+      pickup_location: pickupLocation,
       available_until: expiryDate,
       available_from: pickupDate,
     };
 
     try {
-      // Validate input
       const validated = listingSchema.parse(data);
 
-      let imageUrl = null;
+      let imageUrl = imagePreview;
 
-      // Upload image if selected
       if (selectedImage && userId) {
         const fileExt = selectedImage.name.split(".").pop();
         const fileName = `${userId}/${Date.now()}.${fileExt}`;
@@ -107,7 +154,6 @@ const CreateListing = () => {
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from("food-images")
           .getPublicUrl(fileName);
@@ -115,28 +161,29 @@ const CreateListing = () => {
         imageUrl = publicUrl;
       }
 
-      // Create listing
-      const { error } = await supabase.from("food_listings").insert({
-        donor_id: userId,
-        title: validated.title,
-        description: validated.description,
-        category: validated.category,
-        quantity: validated.quantity,
-        pickup_location: validated.pickup_location,
-        available_until: validated.available_until.toISOString(),
-        available_from: validated.available_from.toISOString(),
-        contactless_pickup: contactlessPickup,
-        image_url: imageUrl,
-      });
+      const { error } = await supabase
+        .from("food_listings")
+        .update({
+          title: validated.title,
+          description: validated.description,
+          category: validated.category,
+          quantity: validated.quantity,
+          pickup_location: validated.pickup_location,
+          available_until: validated.available_until.toISOString(),
+          available_from: validated.available_from.toISOString(),
+          contactless_pickup: contactlessPickup,
+          image_url: imageUrl,
+        })
+        .eq("id", id);
 
       if (error) throw error;
 
       toast({
         title: "Success!",
-        description: "Your food listing has been created.",
+        description: "Your listing has been updated.",
       });
 
-      navigate("/browse");
+      navigate(`/listing/${id}`);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({
@@ -147,7 +194,7 @@ const CreateListing = () => {
       } else {
         toast({
           title: "Error",
-          description: error.message || "Failed to create listing",
+          description: error.message || "Failed to update listing",
           variant: "destructive",
         });
       }
@@ -156,18 +203,26 @@ const CreateListing = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Leaf className="h-12 w-12 text-primary animate-pulse" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/listing/${id}`)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
             <div className="flex items-center gap-2">
               <Leaf className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold text-foreground">Create Listing</span>
+              <span className="text-xl font-bold text-foreground">Edit Listing</span>
             </div>
           </div>
         </div>
@@ -176,9 +231,9 @@ const CreateListing = () => {
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <Card className="border-border">
           <CardHeader>
-            <CardTitle>Share Your Surplus Food</CardTitle>
+            <CardTitle>Edit Your Food Listing</CardTitle>
             <CardDescription>
-              Fill in the details below to help others in your community
+              Update the details of your food listing
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -187,7 +242,8 @@ const CreateListing = () => {
                 <Label htmlFor="title">Title *</Label>
                 <Input
                   id="title"
-                  name="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., Fresh vegetables from garden"
                   required
                   maxLength={100}
@@ -199,7 +255,8 @@ const CreateListing = () => {
                 <Label htmlFor="description">Description *</Label>
                 <Textarea
                   id="description"
-                  name="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the food items, their condition, and any other relevant details"
                   required
                   maxLength={500}
@@ -208,9 +265,8 @@ const CreateListing = () => {
                 />
               </div>
 
-              {/* Image Upload */}
               <div className="space-y-2">
-                <Label>Food Image (Optional)</Label>
+                <Label>Food Image</Label>
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                   {imagePreview ? (
                     <div className="relative">
@@ -277,7 +333,8 @@ const CreateListing = () => {
                   <Label htmlFor="quantity">Quantity *</Label>
                   <Input
                     id="quantity"
-                    name="quantity"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
                     placeholder="e.g., 2kg, 5 servings, 1 basket"
                     required
                     maxLength={50}
@@ -290,18 +347,15 @@ const CreateListing = () => {
                 <Label htmlFor="pickup_location">Pickup Location *</Label>
                 <Input
                   id="pickup_location"
-                  name="pickup_location"
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
                   placeholder="e.g., 123 Main St, Apartment 4B, City"
                   required
                   maxLength={200}
                   disabled={isLoading}
                 />
-                <p className="text-sm text-muted-foreground">
-                  Provide enough detail for pickup but protect your privacy
-                </p>
               </div>
 
-              {/* Pickup Time Calendar */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Pickup Available From *</Label>
@@ -403,12 +457,12 @@ const CreateListing = () => {
 
               <div className="flex gap-4">
                 <Button type="submit" className="flex-1" disabled={isLoading}>
-                  {isLoading ? "Creating..." : "Create Listing"}
+                  {isLoading ? "Updating..." : "Update Listing"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => navigate(`/listing/${id}`)}
                   disabled={isLoading}
                 >
                   Cancel
@@ -422,4 +476,4 @@ const CreateListing = () => {
   );
 };
 
-export default CreateListing;
+export default EditListing;

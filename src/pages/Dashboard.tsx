@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, LogOut, Plus, MapPin, Clock, Package } from "lucide-react";
+import { Leaf, LogOut, Plus, MapPin, Clock, Package, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher, useLanguage } from "@/components/LanguageSwitcher";
@@ -156,6 +156,10 @@ const Dashboard = () => {
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <LanguageSwitcher language={language} setLanguage={setLanguage} />
+            <Button variant="ghost" size="sm" onClick={() => navigate("/community")}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Community
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/analytics")}>
               {t("analytics")}
             </Button>

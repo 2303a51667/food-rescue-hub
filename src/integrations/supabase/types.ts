@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      community_activities: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          id: string
+          listing_id: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          id?: string
+          listing_id?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          id?: string
+          listing_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_activities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "food_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       food_listings: {
         Row: {
           available_from: string | null
@@ -21,6 +53,7 @@ export type Database = {
           category: string
           claimed_at: string | null
           claimed_by: string | null
+          contactless_pickup: boolean | null
           created_at: string | null
           description: string
           donor_id: string
@@ -29,7 +62,10 @@ export type Database = {
           pickup_latitude: number | null
           pickup_location: string
           pickup_longitude: number | null
+          quality_rating: number | null
           quantity: string
+          safety_confirmed: boolean | null
+          shelf_life_status: string | null
           status: string
           title: string
           updated_at: string | null
@@ -40,6 +76,7 @@ export type Database = {
           category: string
           claimed_at?: string | null
           claimed_by?: string | null
+          contactless_pickup?: boolean | null
           created_at?: string | null
           description: string
           donor_id: string
@@ -48,7 +85,10 @@ export type Database = {
           pickup_latitude?: number | null
           pickup_location: string
           pickup_longitude?: number | null
+          quality_rating?: number | null
           quantity: string
+          safety_confirmed?: boolean | null
+          shelf_life_status?: string | null
           status?: string
           title: string
           updated_at?: string | null
@@ -59,6 +99,7 @@ export type Database = {
           category?: string
           claimed_at?: string | null
           claimed_by?: string | null
+          contactless_pickup?: boolean | null
           created_at?: string | null
           description?: string
           donor_id?: string
@@ -67,7 +108,10 @@ export type Database = {
           pickup_latitude?: number | null
           pickup_location?: string
           pickup_longitude?: number | null
+          quality_rating?: number | null
           quantity?: string
+          safety_confirmed?: boolean | null
+          shelf_life_status?: string | null
           status?: string
           title?: string
           updated_at?: string | null
@@ -85,6 +129,41 @@ export type Database = {
             columns: ["donor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      food_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          listing_id: string
+          rating: number
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          listing_id: string
+          rating: number
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          listing_id?: string
+          rating?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_ratings_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "food_listings"
             referencedColumns: ["id"]
           },
         ]
@@ -115,6 +194,47 @@ export type Database = {
           sender_id?: string
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          listing_id: string | null
+          message: string
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          listing_id?: string | null
+          message: string
+          read?: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          listing_id?: string | null
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "food_listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -178,7 +298,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mark_expired_listings: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
