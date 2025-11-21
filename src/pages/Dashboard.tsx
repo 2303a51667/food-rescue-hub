@@ -101,7 +101,7 @@ const Dashboard = () => {
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <Card className="border-border hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="border-border hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/create-listing")}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -122,7 +122,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-border hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="border-border hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/browse")}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
