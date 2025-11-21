@@ -14,6 +14,8 @@ import Chat from "./pages/Chat";
 import Analytics from "./pages/Analytics";
 import MapView from "./pages/MapView";
 import CommunityFeed from "./pages/CommunityFeed";
+import Profile from "./pages/Profile";
+import Leaderboard from "./pages/Leaderboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/map" element={<MapView />} />
           <Route path="/community" element={<CommunityFeed />} />
+          <Route path="/profile/:id?" element={<Profile />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
