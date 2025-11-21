@@ -4,11 +4,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, LogOut, Plus, MapPin, Clock } from "lucide-react";
+import { Leaf, LogOut, Plus, MapPin, Clock, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+
+interface UserProfile {
+  meals_shared: number;
+  meals_received: number;
+  co2_saved: number;
+}
+
+interface FoodListing {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  category: string;
+}
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [recentListings, setRecentListings] = useState<FoodListing[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -18,9 +35,10 @@ const Dashboard = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
-        setLoading(false);
-        
-        if (!session?.user) {
+        if (session?.user) {
+          fetchUserData(session.user.id);
+        } else {
+          setLoading(false);
           navigate("/auth");
         }
       }
@@ -29,15 +47,49 @@ const Dashboard = () => {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      setLoading(false);
-      
-      if (!session?.user) {
+      if (session?.user) {
+        fetchUserData(session.user.id);
+      } else {
+        setLoading(false);
         navigate("/auth");
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("meals_shared, meals_received, co2_saved")
+        .eq("id", userId)
+        .single();
+
+      if (profileError) throw profileError;
+      setProfile(profileData);
+
+      // Fetch recent listings
+      const { data: listingsData, error: listingsError } = await supabase
+        .from("food_listings")
+        .select("id, title, status, created_at, category")
+        .eq("donor_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (listingsError) throw listingsError;
+      setRecentListings(listingsData || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load user data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -54,6 +106,28 @@ const Dashboard = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: { [key: string]: string } = {
+      available: "bg-success/10 text-success",
+      claimed: "bg-warning/10 text-warning",
+      completed: "bg-primary/10 text-primary",
+      expired: "bg-muted text-muted-foreground",
+    };
+    return colors[status] || colors.available;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 1) return "Just now";
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
   };
 
   if (loading) {
@@ -153,9 +227,11 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">0</div>
+              <div className="text-3xl font-bold text-foreground">
+                {profile?.meals_shared || 0}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Start sharing to see your impact
+                {profile?.meals_shared ? "Keep up the great work!" : "Start sharing to see your impact"}
               </p>
             </CardContent>
           </Card>
@@ -167,9 +243,11 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">0</div>
+              <div className="text-3xl font-bold text-foreground">
+                {profile?.meals_received || 0}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Browse available food nearby
+                {profile?.meals_received ? "Thank you for reducing waste!" : "Browse available food nearby"}
               </p>
             </CardContent>
           </Card>
@@ -181,7 +259,9 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">0 kg</div>
+              <div className="text-3xl font-bold text-foreground">
+                {profile?.co2_saved?.toFixed(1) || 0} kg
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Environmental impact tracker
               </p>
@@ -196,11 +276,37 @@ const Dashboard = () => {
             <CardDescription>Your food sharing history</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-12 text-muted-foreground">
-              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No activity yet</p>
-              <p className="text-sm mt-2">Start by creating or browsing listings</p>
-            </div>
+            {recentListings.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No activity yet</p>
+                <p className="text-sm mt-2">Start by creating or browsing listings</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentListings.map((listing) => (
+                  <div
+                    key={listing.id}
+                    className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Package className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{listing.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(listing.created_at)} • {listing.category}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className={getStatusColor(listing.status)}>
+                      {listing.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
