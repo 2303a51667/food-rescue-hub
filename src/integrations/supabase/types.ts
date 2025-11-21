@@ -59,11 +59,15 @@ export type Database = {
           donor_id: string
           id: string
           image_url: string | null
+          pickup_confirmed_by_donor: boolean | null
+          pickup_confirmed_by_receiver: boolean | null
           pickup_latitude: number | null
           pickup_location: string
           pickup_longitude: number | null
           quality_rating: number | null
           quantity: string
+          request_status: string | null
+          requested_by: string[] | null
           safety_confirmed: boolean | null
           shelf_life_status: string | null
           status: string
@@ -82,11 +86,15 @@ export type Database = {
           donor_id: string
           id?: string
           image_url?: string | null
+          pickup_confirmed_by_donor?: boolean | null
+          pickup_confirmed_by_receiver?: boolean | null
           pickup_latitude?: number | null
           pickup_location: string
           pickup_longitude?: number | null
           quality_rating?: number | null
           quantity: string
+          request_status?: string | null
+          requested_by?: string[] | null
           safety_confirmed?: boolean | null
           shelf_life_status?: string | null
           status?: string
@@ -105,11 +113,15 @@ export type Database = {
           donor_id?: string
           id?: string
           image_url?: string | null
+          pickup_confirmed_by_donor?: boolean | null
+          pickup_confirmed_by_receiver?: boolean | null
           pickup_latitude?: number | null
           pickup_location?: string
           pickup_longitude?: number | null
           quality_rating?: number | null
           quantity?: string
+          request_status?: string | null
+          requested_by?: string[] | null
           safety_confirmed?: boolean | null
           shelf_life_status?: string | null
           status?: string
@@ -242,6 +254,8 @@ export type Database = {
           bio: string | null
           co2_saved: number | null
           created_at: string | null
+          hide_email: boolean | null
+          hide_phone: boolean | null
           id: string
           is_verified: boolean | null
           location: string | null
@@ -251,7 +265,9 @@ export type Database = {
           organization_name: string | null
           organization_type: string | null
           phone: string | null
+          privacy_chat_only: boolean | null
           role: string
+          total_points: number | null
           updated_at: string | null
           verification_date: string | null
         }
@@ -260,6 +276,8 @@ export type Database = {
           bio?: string | null
           co2_saved?: number | null
           created_at?: string | null
+          hide_email?: boolean | null
+          hide_phone?: boolean | null
           id: string
           is_verified?: boolean | null
           location?: string | null
@@ -269,7 +287,9 @@ export type Database = {
           organization_name?: string | null
           organization_type?: string | null
           phone?: string | null
+          privacy_chat_only?: boolean | null
           role: string
+          total_points?: number | null
           updated_at?: string | null
           verification_date?: string | null
         }
@@ -278,6 +298,8 @@ export type Database = {
           bio?: string | null
           co2_saved?: number | null
           created_at?: string | null
+          hide_email?: boolean | null
+          hide_phone?: boolean | null
           id?: string
           is_verified?: boolean | null
           location?: string | null
@@ -287,9 +309,94 @@ export type Database = {
           organization_name?: string | null
           organization_type?: string | null
           phone?: string | null
+          privacy_chat_only?: boolean | null
           role?: string
+          total_points?: number | null
           updated_at?: string | null
           verification_date?: string | null
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          report_type: string
+          reported_listing_id: string | null
+          reporter_id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          report_type: string
+          reported_listing_id?: string | null
+          reporter_id: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          report_type?: string
+          reported_listing_id?: string | null
+          reporter_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_reported_listing_id_fkey"
+            columns: ["reported_listing_id"]
+            isOneToOne: false
+            referencedRelation: "food_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_badges: {
+        Row: {
+          badge_name: string
+          badge_type: string
+          earned_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_name: string
+          badge_type: string
+          earned_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_name?: string
+          badge_type?: string
+          earned_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -298,10 +405,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       mark_expired_listings: { Args: never; Returns: undefined }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -428,6 +542,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
