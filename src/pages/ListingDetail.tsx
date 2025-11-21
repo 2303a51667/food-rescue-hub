@@ -144,11 +144,16 @@ const ListingDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => navigate("/browse")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Browse
           </Button>
+          {isDonor && (
+            <Button variant="outline" onClick={() => navigate(`/edit-listing/${listing.id}`)}>
+              Edit Listing
+            </Button>
+          )}
         </div>
       </header>
 

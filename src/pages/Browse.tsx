@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Leaf, MapPin, Clock, User, Filter } from "lucide-react";
+import { Leaf, MapPin, Clock, User, Filter, Map as MapIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 interface FoodListing {
   id: string;
@@ -21,6 +22,8 @@ interface FoodListing {
   image_url: string | null;
   profiles: {
     name: string;
+    is_verified: boolean;
+    organization_type: string;
   };
 }
 
@@ -51,7 +54,9 @@ const Browse = () => {
         .select(`
           *,
           profiles!donor_id (
-            name
+            name,
+            is_verified,
+            organization_type
           )
         `)
         .eq("status", "available")
@@ -121,9 +126,15 @@ const Browse = () => {
               </Button>
               <span className="text-xl font-bold text-foreground">Browse Food</span>
             </div>
-            <Button onClick={() => navigate("/create-listing")}>
-              Share Food
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate("/map")}>
+                <MapIcon className="h-4 w-4 mr-2" />
+                Map View
+              </Button>
+              <Button onClick={() => navigate("/create-listing")}>
+                Share Food
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -193,9 +204,13 @@ const Browse = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    <span>{listing.profiles.name}</span>
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">{listing.profiles.name}</span>
+                    <VerifiedBadge 
+                      isVerified={listing.profiles.is_verified}
+                      organizationType={listing.profiles.organization_type}
+                    />
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />

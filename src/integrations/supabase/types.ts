@@ -123,13 +123,17 @@ export type Database = {
           co2_saved: number | null
           created_at: string | null
           id: string
+          is_verified: boolean | null
           location: string | null
           meals_received: number | null
           meals_shared: number | null
           name: string
+          organization_name: string | null
+          organization_type: string | null
           phone: string | null
           role: string
           updated_at: string | null
+          verification_date: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -137,13 +141,17 @@ export type Database = {
           co2_saved?: number | null
           created_at?: string | null
           id: string
+          is_verified?: boolean | null
           location?: string | null
           meals_received?: number | null
           meals_shared?: number | null
           name: string
+          organization_name?: string | null
+          organization_type?: string | null
           phone?: string | null
           role: string
           updated_at?: string | null
+          verification_date?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -151,13 +159,17 @@ export type Database = {
           co2_saved?: number | null
           created_at?: string | null
           id?: string
+          is_verified?: boolean | null
           location?: string | null
           meals_received?: number | null
           meals_shared?: number | null
           name?: string
+          organization_name?: string | null
+          organization_type?: string | null
           phone?: string | null
           role?: string
           updated_at?: string | null
+          verification_date?: string | null
         }
         Relationships: []
       }
