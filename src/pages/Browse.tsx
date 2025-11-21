@@ -18,6 +18,7 @@ interface FoodListing {
   available_until: string;
   status: string;
   created_at: string;
+  image_url: string | null;
   profiles: {
     name: string;
   };
@@ -166,7 +167,16 @@ const Browse = () => {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredListings.map((listing) => (
-              <Card key={listing.id} className="border-border hover:shadow-lg transition-shadow">
+              <Card key={listing.id} className="border-border hover:shadow-lg transition-shadow overflow-hidden">
+                {listing.image_url && (
+                  <div className="aspect-video w-full overflow-hidden bg-muted">
+                    <img
+                      src={listing.image_url}
+                      alt={listing.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <CardHeader>
                   <div className="flex items-start justify-between mb-2">
                     <Badge className={getCategoryColor(listing.category)}>
