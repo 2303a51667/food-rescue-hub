@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Leaf, MapPin, Clock, User, Filter, Map as MapIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Leaf, MapPin, Clock, User, Filter, Map as MapIcon, Search, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import ShelfLifeIndicator from "@/components/ShelfLifeIndicator";
 
 interface FoodListing {
   id: string;
@@ -20,6 +22,8 @@ interface FoodListing {
   status: string;
   created_at: string;
   image_url: string | null;
+  shelf_life_status: string;
+  quality_rating: number | null;
   profiles: {
     name: string;
     is_verified: boolean;
@@ -32,6 +36,8 @@ const Browse = () => {
   const [filteredListings, setFilteredListings] = useState<FoodListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [shelfLifeFilter, setShelfLifeFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -40,12 +46,30 @@ const Browse = () => {
   }, []);
 
   useEffect(() => {
-    if (categoryFilter === "all") {
-      setFilteredListings(listings);
-    } else {
-      setFilteredListings(listings.filter(l => l.category === categoryFilter));
+    let filtered = listings;
+
+    // Category filter
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(l => l.category === categoryFilter);
     }
-  }, [categoryFilter, listings]);
+
+    // Shelf life filter
+    if (shelfLifeFilter !== "all") {
+      filtered = filtered.filter(l => l.shelf_life_status === shelfLifeFilter);
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(l =>
+        l.title.toLowerCase().includes(query) ||
+        l.description.toLowerCase().includes(query) ||
+        l.pickup_location.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredListings(filtered);
+  }, [categoryFilter, shelfLifeFilter, searchQuery, listings]);
 
   const fetchListings = async () => {
     try {
@@ -127,6 +151,10 @@ const Browse = () => {
               <span className="text-xl font-bold text-foreground">Browse Food</span>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate("/community")}>
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Community
+              </Button>
               <Button variant="outline" size="sm" onClick={() => navigate("/map")}>
                 <MapIcon className="h-4 w-4 mr-2" />
                 Map View
@@ -140,26 +168,53 @@ const Browse = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center gap-4">
-          <Filter className="h-5 w-5 text-muted-foreground" />
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="vegetables">Vegetables</SelectItem>
-              <SelectItem value="fruits">Fruits</SelectItem>
-              <SelectItem value="bakery">Bakery</SelectItem>
-              <SelectItem value="dairy">Dairy</SelectItem>
-              <SelectItem value="meals">Prepared Meals</SelectItem>
-              <SelectItem value="packaged">Packaged Foods</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-sm text-muted-foreground">
-            {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''} available
-          </span>
+        <div className="mb-6 space-y-4">
+          {/* Search Bar */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search food, location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="vegetables">Vegetables</SelectItem>
+                <SelectItem value="fruits">Fruits</SelectItem>
+                <SelectItem value="bakery">Bakery</SelectItem>
+                <SelectItem value="dairy">Dairy</SelectItem>
+                <SelectItem value="meals">Prepared Meals</SelectItem>
+                <SelectItem value="packaged">Packaged Foods</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={shelfLifeFilter} onValueChange={setShelfLifeFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Freshness" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Freshness</SelectItem>
+                <SelectItem value="fresh">Fresh</SelectItem>
+                <SelectItem value="expiring_soon">Expiring Soon</SelectItem>
+                <SelectItem value="expiring_today">Expiring Today</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <span className="text-sm text-muted-foreground">
+              {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''} available
+            </span>
+          </div>
         </div>
 
         {filteredListings.length === 0 ? (
@@ -189,10 +244,16 @@ const Browse = () => {
                   </div>
                 )}
                 <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <Badge className={getCategoryColor(listing.category)}>
-                      {listing.category}
-                    </Badge>
+                  <div className="flex items-start justify-between mb-2 flex-wrap gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge className={getCategoryColor(listing.category)}>
+                        {listing.category}
+                      </Badge>
+                      <ShelfLifeIndicator
+                        status={listing.shelf_life_status}
+                        availableUntil={listing.available_until}
+                      />
+                    </div>
                     <Badge variant="outline" className="text-xs">
                       <Clock className="h-3 w-3 mr-1" />
                       {formatDate(listing.available_until)}
