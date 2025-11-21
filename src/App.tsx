@@ -16,6 +16,7 @@ import MapView from "./pages/MapView";
 import CommunityFeed from "./pages/CommunityFeed";
 import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
+import History from "./pages/History";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/community" element={<CommunityFeed />} />
           <Route path="/profile/:id?" element={<Profile />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/history" element={<History />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

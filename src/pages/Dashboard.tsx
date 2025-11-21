@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, LogOut, Plus, MapPin, Clock, Package, TrendingUp, Trophy, UserCircle } from "lucide-react";
+import { Leaf, LogOut, Plus, MapPin, Clock, Package, TrendingUp, Trophy, UserCircle, History as HistoryIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher, useLanguage } from "@/components/LanguageSwitcher";
@@ -225,6 +225,10 @@ const Dashboard = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/profile")}>
               <UserCircle className="h-4 w-4 mr-2" />
               Profile
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/history")}>
+              <HistoryIcon className="h-4 w-4 mr-2" />
+              History
             </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/analytics")}>
               {t("analytics")}
