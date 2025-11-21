@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Leaf, LogOut, Plus, MapPin, Clock, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { LanguageSwitcher, useLanguage } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface UserProfile {
   meals_shared: number;
@@ -29,6 +31,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     // Set up auth state listener
@@ -151,12 +154,17 @@ const Dashboard = () => {
             <span className="text-2xl font-bold text-foreground">FoodShare</span>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <LanguageSwitcher language={language} setLanguage={setLanguage} />
+            <Button variant="ghost" size="sm" onClick={() => navigate("/analytics")}>
+              {t("analytics")}
+            </Button>
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {user?.user_metadata?.name || user?.email}
             </span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              {t("signOut")}
             </Button>
           </div>
         </div>
@@ -166,10 +174,13 @@ const Dashboard = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">
-            Welcome back, {user?.user_metadata?.name?.split(' ')[0] || 'Friend'}!
+            {t("welcomeBack")}, {user?.user_metadata?.name?.split(' ')[0] || 'Friend'}!
           </h1>
           <p className="text-lg text-muted-foreground">
-            Ready to make a difference today?
+            {t("readyToMake")}
+          </p>
+          <p className="text-2xl font-semibold text-success mt-4">
+            Share Food, Save Lives.
           </p>
         </div>
 
@@ -287,7 +298,8 @@ const Dashboard = () => {
                 {recentListings.map((listing) => (
                   <div
                     key={listing.id}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/listing/${listing.id}`)}
                   >
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">

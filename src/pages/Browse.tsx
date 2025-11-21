@@ -194,8 +194,11 @@ const Browse = () => {
                   <div className="text-sm font-medium text-foreground">
                     Quantity: {listing.quantity}
                   </div>
-                  <Button className="w-full mt-4">
-                    Claim Food
+                  <Button 
+                    className="w-full mt-4"
+                    onClick={() => navigate(`/listing/${listing.id}`)}
+                  >
+                    View Details
                   </Button>
                 </CardContent>
               </Card>
