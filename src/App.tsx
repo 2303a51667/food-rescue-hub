@@ -11,6 +11,7 @@ import Browse from "./pages/Browse";
 import ListingDetail from "./pages/ListingDetail";
 import Chat from "./pages/Chat";
 import Analytics from "./pages/Analytics";
+import MapView from "./pages/MapView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/listing/:id" element={<ListingDetail />} />
           <Route path="/chat/:userId" element={<Chat />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/map" element={<MapView />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
