@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, ArrowLeft, Send } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Leaf, ArrowLeft, Send, Circle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -17,14 +18,22 @@ interface Message {
   read: boolean;
 }
 
+interface TypingIndicator {
+  user_id: string;
+  is_typing: boolean;
+}
+
 const Chat = () => {
   const { userId } = useParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [otherUserName, setOtherUserName] = useState("");
+  const [isOnline, setIsOnline] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -36,9 +45,11 @@ const Chat = () => {
     if (currentUserId && userId) {
       fetchMessages();
       fetchOtherUserName();
+      subscribeToPresence();
+      updatePresence('online');
       
       // Subscribe to new messages (bidirectional)
-      const channel = supabase
+      const messagesChannel = supabase
         .channel('messages-chat')
         .on(
           'postgres_changes',
@@ -56,13 +67,48 @@ const Chat = () => {
             ) {
               setMessages(prev => [...prev, newMsg]);
               scrollToBottom();
+              
+              // Mark as read if from other user
+              if (newMsg.sender_id === userId) {
+                markAsRead(newMsg.id);
+              }
             }
           }
         )
         .subscribe();
 
+      // Subscribe to typing indicators
+      const typingChannel = supabase
+        .channel('typing-indicators')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'typing_indicators'
+          },
+          (payload) => {
+            const indicator = payload.new as TypingIndicator;
+            if (indicator.user_id === userId) {
+              setIsTyping(indicator.is_typing);
+            }
+          }
+        )
+        .subscribe();
+
+      // Update presence on window focus/blur
+      const handleFocus = () => updatePresence('online');
+      const handleBlur = () => updatePresence('offline');
+      
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('blur', handleBlur);
+
       return () => {
-        supabase.removeChannel(channel);
+        updatePresence('offline');
+        supabase.removeChannel(messagesChannel);
+        supabase.removeChannel(typingChannel);
+        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('blur', handleBlur);
       };
     }
   }, [currentUserId, userId]);
@@ -117,9 +163,119 @@ const Chat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const updatePresence = async (status: 'online' | 'offline') => {
+    if (!currentUserId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_presence')
+        .upsert({
+          user_id: currentUserId,
+          status,
+          last_seen: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) console.error('Error updating presence:', error);
+    } catch (error) {
+      console.error('Error updating presence:', error);
+    }
+  };
+
+  const subscribeToPresence = () => {
+    const channel = supabase
+      .channel('user-presence-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_presence',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          const presence = payload.new as any;
+          setIsOnline(presence.status === 'online');
+        }
+      )
+      .subscribe();
+
+    // Also fetch initial status
+    supabase
+      .from('user_presence')
+      .select('status')
+      .eq('user_id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data) setIsOnline(data.status === 'online');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const markAsRead = async (messageId: string) => {
+    try {
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('id', messageId);
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  const updateTypingStatus = async (isTyping: boolean) => {
+    if (!currentUserId || !userId) return;
+
+    try {
+      await supabase
+        .from('typing_indicators')
+        .upsert({
+          user_id: currentUserId,
+          chat_with: userId,
+          is_typing: isTyping,
+          updated_at: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('Error updating typing status:', error);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+
+    // Update typing indicator
+    if (e.target.value.trim()) {
+      updateTypingStatus(true);
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Set new timeout to stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        updateTypingStatus(false);
+      }, 2000);
+    } else {
+      updateTypingStatus(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !currentUserId || !userId) return;
+
+    // Stop typing indicator
+    updateTypingStatus(false);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
 
     try {
       const { error } = await supabase
@@ -133,7 +289,7 @@ const Chat = () => {
       if (error) throw error;
 
       setNewMessage("");
-      fetchMessages();
+      scrollToBottom();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -159,7 +315,17 @@ const Chat = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div className="text-lg font-semibold">{otherUserName}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold">{otherUserName}</span>
+            <div className="flex items-center gap-1">
+              <Circle
+                className={`h-2 w-2 ${isOnline ? 'fill-success text-success' : 'fill-muted-foreground text-muted-foreground'}`}
+              />
+              <span className="text-xs text-muted-foreground">
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+          </div>
           <div className="w-20" />
         </div>
       </header>
@@ -189,12 +355,30 @@ const Chat = () => {
                       }`}
                     >
                       <p className="text-sm">{msg.message}</p>
-                      <p className="text-xs opacity-70 mt-1">
-                        {format(new Date(msg.created_at), "p")}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs opacity-70">
+                          {format(new Date(msg.created_at), "p")}
+                        </p>
+                        {msg.sender_id === currentUserId && (
+                          <span className="text-xs opacity-70">
+                            {msg.read ? '✓✓' : '✓'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))
+              )}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-muted text-foreground rounded-lg p-3">
+                    <div className="flex gap-1">
+                      <span className="animate-bounce">●</span>
+                      <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>●</span>
+                      <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>●</span>
+                    </div>
+                  </div>
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -202,11 +386,11 @@ const Chat = () => {
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <Input
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={handleInputChange}
                 placeholder="Type a message..."
                 className="flex-1"
               />
-              <Button type="submit" size="icon">
+              <Button type="submit" size="icon" disabled={!newMessage.trim()}>
                 <Send className="h-4 w-4" />
               </Button>
             </form>

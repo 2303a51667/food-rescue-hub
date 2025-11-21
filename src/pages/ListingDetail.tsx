@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Leaf, ArrowLeft, MapPin, Clock, User, Package, Calendar, MessageCircle, Edit } from "lucide-react";
+import { Leaf, ArrowLeft, MapPin, Clock, User, Package, Calendar, MessageCircle, Edit, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import QRCode from "react-qr-code";
 import ReportDialog from "@/components/ReportDialog";
 import ShareButton from "@/components/ShareButton";
+import RatingDialog from "@/components/RatingDialog";
 
 interface ListingDetail {
   id: string;
@@ -375,10 +376,19 @@ const ListingDetail = () => {
               )}
               
               {isClaimed && !isDonor && (
-                <Button className="w-full" onClick={() => navigate(`/chat/${listing.donor_id}`)}>
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Chat with Donor
-                </Button>
+                <>
+                  <Button className="w-full" onClick={() => navigate(`/chat/${listing.donor_id}`)}>
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Chat with Donor
+                  </Button>
+                  {currentUserId && listing.status === "completed" && (
+                    <RatingDialog
+                      listingId={listing.id}
+                      userId={currentUserId}
+                      donorName={listing.profiles.name}
+                    />
+                  )}
+                </>
               )}
               
               {isDonor && isClaimed && (
