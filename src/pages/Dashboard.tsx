@@ -259,7 +259,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="border-border hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/create-listing")}>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -298,6 +298,27 @@ const Dashboard = () => {
             <CardContent>
               <Button variant="outline" className="w-full">
                 Browse Listings
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/analytics")}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Your Impact</CardTitle>
+                  <CardDescription>
+                    View detailed analytics and stats
+                  </CardDescription>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-success" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" className="w-full">
+                View Analytics
               </Button>
             </CardContent>
           </Card>
