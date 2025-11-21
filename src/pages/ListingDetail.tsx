@@ -47,7 +47,35 @@ const ListingDetail = () => {
   useEffect(() => {
     fetchListing();
     getCurrentUser();
-  }, [id]);
+
+    // Set up real-time subscription for this specific listing
+    const channel = supabase
+      .channel('listing-detail-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'food_listings',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          console.log('Listing changed:', payload);
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            // Refetch to get complete data with profiles
+            fetchListing();
+          } else if (payload.eventType === 'DELETE') {
+            // Navigate away if listing was deleted
+            navigate('/browse');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, navigate]);
 
   const getCurrentUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();

@@ -43,6 +43,28 @@ const Browse = () => {
 
   useEffect(() => {
     fetchListings();
+
+    // Set up real-time subscription for food listings
+    const channel = supabase
+      .channel('food-listings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'food_listings'
+        },
+        (payload) => {
+          console.log('Food listing changed:', payload);
+          // Refresh listings on any change
+          fetchListings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
