@@ -14,7 +14,126 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      food_listings: {
+        Row: {
+          available_from: string | null
+          available_until: string
+          category: string
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string | null
+          description: string
+          donor_id: string
+          id: string
+          image_url: string | null
+          pickup_latitude: number | null
+          pickup_location: string
+          pickup_longitude: number | null
+          quantity: string
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          available_from?: string | null
+          available_until: string
+          category: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string | null
+          description: string
+          donor_id: string
+          id?: string
+          image_url?: string | null
+          pickup_latitude?: number | null
+          pickup_location: string
+          pickup_longitude?: number | null
+          quantity: string
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          available_from?: string | null
+          available_until?: string
+          category?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string | null
+          description?: string
+          donor_id?: string
+          id?: string
+          image_url?: string | null
+          pickup_latitude?: number | null
+          pickup_location?: string
+          pickup_longitude?: number | null
+          quantity?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_listings_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "food_listings_donor_id_fkey"
+            columns: ["donor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          co2_saved: number | null
+          created_at: string | null
+          id: string
+          location: string | null
+          meals_received: number | null
+          meals_shared: number | null
+          name: string
+          phone: string | null
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          co2_saved?: number | null
+          created_at?: string | null
+          id: string
+          location?: string | null
+          meals_received?: number | null
+          meals_shared?: number | null
+          name: string
+          phone?: string | null
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          co2_saved?: number | null
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          meals_received?: number | null
+          meals_shared?: number | null
+          name?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
