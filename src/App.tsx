@@ -12,7 +12,6 @@ import Browse from "./pages/Browse";
 import ListingDetail from "./pages/ListingDetail";
 import Chat from "./pages/Chat";
 import Analytics from "./pages/Analytics";
-import MapView from "./pages/MapView";
 import CommunityFeed from "./pages/CommunityFeed";
 import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
@@ -37,7 +36,6 @@ const App = () => (
           <Route path="/edit-listing/:id" element={<EditListing />} />
           <Route path="/chat/:userId" element={<Chat />} />
           <Route path="/analytics" element={<Analytics />} />
-          <Route path="/map" element={<MapView />} />
           <Route path="/community" element={<CommunityFeed />} />
           <Route path="/profile/:id?" element={<Profile />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
