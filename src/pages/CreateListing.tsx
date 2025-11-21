@@ -7,9 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Leaf, ArrowLeft } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Leaf, ArrowLeft, CalendarIcon, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const listingSchema = z.object({
   title: z.string().trim().min(3, "Title must be at least 3 characters").max(100, "Title too long"),
@@ -17,12 +21,18 @@ const listingSchema = z.object({
   category: z.enum(["vegetables", "fruits", "bakery", "dairy", "meals", "packaged", "other"]),
   quantity: z.string().trim().min(1, "Quantity is required").max(50, "Quantity description too long"),
   pickup_location: z.string().trim().min(5, "Location must be at least 5 characters").max(200, "Location too long"),
-  available_until: z.string().min(1, "Expiry date is required"),
+  available_until: z.date({ required_error: "Expiry date is required" }),
+  available_from: z.date({ required_error: "Pickup time is required" }),
 });
 
 const CreateListing = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [pickupDate, setPickupDate] = useState<Date>();
+  const [expiryDate, setExpiryDate] = useState<Date>();
+  const [category, setCategory] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -38,6 +48,31 @@ const CreateListing = () => {
     checkAuth();
   }, [navigate]);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Image must be less than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -46,15 +81,37 @@ const CreateListing = () => {
     const data = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      category: formData.get("category") as string,
+      category: category,
       quantity: formData.get("quantity") as string,
       pickup_location: formData.get("pickup_location") as string,
-      available_until: formData.get("available_until") as string,
+      available_until: expiryDate,
+      available_from: pickupDate,
     };
 
     try {
       // Validate input
       const validated = listingSchema.parse(data);
+
+      let imageUrl = null;
+
+      // Upload image if selected
+      if (selectedImage && userId) {
+        const fileExt = selectedImage.name.split(".").pop();
+        const fileName = `${userId}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from("food-images")
+          .upload(fileName, selectedImage);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from("food-images")
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
+      }
 
       // Create listing
       const { error } = await supabase.from("food_listings").insert({
@@ -64,7 +121,9 @@ const CreateListing = () => {
         category: validated.category,
         quantity: validated.quantity,
         pickup_location: validated.pickup_location,
-        available_until: new Date(validated.available_until).toISOString(),
+        available_until: validated.available_until.toISOString(),
+        available_from: validated.available_from.toISOString(),
+        image_url: imageUrl,
       });
 
       if (error) throw error;
@@ -146,10 +205,56 @@ const CreateListing = () => {
                 />
               </div>
 
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label>Food Image (Optional)</Label>
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="max-h-64 mx-auto rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={removeImage}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <Label
+                        htmlFor="image-upload"
+                        className="cursor-pointer text-primary hover:underline"
+                      >
+                        Click to upload food image
+                      </Label>
+                      <Input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageChange}
+                        disabled={isLoading}
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Max 5MB (JPG, PNG, WEBP)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category">Category *</Label>
-                  <Select name="category" required disabled={isLoading}>
+                  <Select value={category} onValueChange={setCategory} required disabled={isLoading}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -193,16 +298,93 @@ const CreateListing = () => {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="available_until">Available Until *</Label>
-                <Input
-                  id="available_until"
-                  name="available_until"
-                  type="datetime-local"
-                  required
-                  disabled={isLoading}
-                  min={new Date().toISOString().slice(0, 16)}
-                />
+              {/* Pickup Time Calendar */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Pickup Available From *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !pickupDate && "text-muted-foreground"
+                        )}
+                        disabled={isLoading}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {pickupDate ? format(pickupDate, "PPP p") : "Select pickup time"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={pickupDate}
+                        onSelect={setPickupDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                      <div className="p-3 border-t">
+                        <Input
+                          type="time"
+                          onChange={(e) => {
+                            if (pickupDate && e.target.value) {
+                              const [hours, minutes] = e.target.value.split(":");
+                              const newDate = new Date(pickupDate);
+                              newDate.setHours(parseInt(hours), parseInt(minutes));
+                              setPickupDate(newDate);
+                            }
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Available Until (Expiry) *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !expiryDate && "text-muted-foreground"
+                        )}
+                        disabled={isLoading}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {expiryDate ? format(expiryDate, "PPP p") : "Select expiry time"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={expiryDate}
+                        onSelect={setExpiryDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                      <div className="p-3 border-t">
+                        <Input
+                          type="time"
+                          onChange={(e) => {
+                            if (expiryDate && e.target.value) {
+                              const [hours, minutes] = e.target.value.split(":");
+                              const newDate = new Date(expiryDate);
+                              newDate.setHours(parseInt(hours), parseInt(minutes));
+                              setExpiryDate(newDate);
+                            }
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               <div className="flex gap-4">

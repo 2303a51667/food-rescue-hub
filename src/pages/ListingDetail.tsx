@@ -18,10 +18,12 @@ interface ListingDetail {
   quantity: string;
   pickup_location: string;
   available_until: string;
+  available_from: string | null;
   status: string;
   created_at: string;
   donor_id: string;
   claimed_by: string | null;
+  image_url: string | null;
   profiles: {
     name: string;
     phone: string | null;
@@ -151,7 +153,16 @@ const ListingDetail = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <Card className="border-border">
+        <Card className="border-border overflow-hidden">
+          {listing.image_url && (
+            <div className="aspect-video w-full overflow-hidden bg-muted">
+              <img
+                src={listing.image_url}
+                alt={listing.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
           <CardHeader>
             <div className="flex items-start justify-between mb-4">
               <div className="space-y-2">
@@ -202,6 +213,18 @@ const ListingDetail = () => {
               </div>
 
               <div className="space-y-4">
+                {listing.available_from && (
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pickup Available From</p>
+                      <p className="font-medium">
+                        {format(new Date(listing.available_from), "PPp")}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-muted-foreground" />
                   <div>
