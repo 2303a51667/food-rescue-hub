@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Leaf, MapPin, Clock, User, Filter, Map as MapIcon, Search, TrendingUp } from "lucide-react";
+import { Leaf, MapPin, Clock, User, Filter, Map as MapIcon, Search, TrendingUp, Navigation } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import ShelfLifeIndicator from "@/components/ShelfLifeIndicator";
+import { calculateDistance, formatDistance, estimateTravelTime } from "@/lib/distance";
 
 interface FoodListing {
   id: string;
@@ -18,6 +19,8 @@ interface FoodListing {
   category: string;
   quantity: string;
   pickup_location: string;
+  pickup_latitude: number | null;
+  pickup_longitude: number | null;
   available_until: string;
   status: string;
   created_at: string;
@@ -38,11 +41,13 @@ const Browse = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [shelfLifeFilter, setShelfLifeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchListings();
+    getUserLocation();
 
     // Set up real-time subscription for food listings
     const channel = supabase
@@ -66,6 +71,22 @@ const Browse = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const getUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Location access denied:", error);
+        }
+      );
+    }
+  };
 
   useEffect(() => {
     let filtered = listings;
@@ -295,9 +316,36 @@ const Browse = () => {
                       organizationType={listing.profiles.organization_type}
                     />
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span className="line-clamp-1">{listing.pickup_location}</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span className="line-clamp-1">{listing.pickup_location}</span>
+                    </div>
+                    {userLocation && listing.pickup_latitude && listing.pickup_longitude && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Badge variant="outline" className="gap-1">
+                          <Navigation className="h-3 w-3" />
+                          {formatDistance(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              listing.pickup_latitude,
+                              listing.pickup_longitude
+                            )
+                          )}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          ~{estimateTravelTime(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              listing.pickup_latitude,
+                              listing.pickup_longitude
+                            )
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="text-sm font-medium text-foreground">
                     Quantity: {listing.quantity}

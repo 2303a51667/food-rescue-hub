@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Leaf, ArrowLeft, MapPin, Clock, User, Package, Calendar, MessageCircle, Edit, Star } from "lucide-react";
+import { Leaf, ArrowLeft, MapPin, Clock, User, Package, Calendar, MessageCircle, Edit, Star, Navigation, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import QRCode from "react-qr-code";
 import ReportDialog from "@/components/ReportDialog";
 import ShareButton from "@/components/ShareButton";
 import RatingDialog from "@/components/RatingDialog";
+import { calculateDistance, formatDistance, estimateTravelTime } from "@/lib/distance";
 
 interface ListingDetail {
   id: string;
@@ -20,6 +21,8 @@ interface ListingDetail {
   category: string;
   quantity: string;
   pickup_location: string;
+  pickup_latitude: number | null;
+  pickup_longitude: number | null;
   available_until: string;
   available_from: string | null;
   status: string;
@@ -29,6 +32,8 @@ interface ListingDetail {
   image_url: string | null;
   requested_by: string[] | null;
   request_status: string;
+  pickup_confirmed_by_donor: boolean | null;
+  pickup_confirmed_by_receiver: boolean | null;
   profiles: {
     name: string;
     phone: string | null;
@@ -42,12 +47,14 @@ const ListingDetail = () => {
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchListing();
     getCurrentUser();
+    getUserLocation();
 
     // Set up real-time subscription for this specific listing
     const channel = supabase
@@ -77,6 +84,22 @@ const ListingDetail = () => {
       supabase.removeChannel(channel);
     };
   }, [id, navigate]);
+
+  const getUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Location access denied:", error);
+        }
+      );
+    }
+  };
 
   const getCurrentUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -193,6 +216,65 @@ const ListingDetail = () => {
     }
   };
 
+  const handleConfirmPickup = async (confirmer: "donor" | "receiver") => {
+    setClaiming(true);
+    try {
+      const updateData = confirmer === "donor" 
+        ? { pickup_confirmed_by_donor: true }
+        : { pickup_confirmed_by_receiver: true };
+
+      const { data, error } = await supabase
+        .from("food_listings")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Check if both have confirmed
+      if (data.pickup_confirmed_by_donor && data.pickup_confirmed_by_receiver) {
+        // Update status to completed
+        await supabase
+          .from("food_listings")
+          .update({ status: "completed" })
+          .eq("id", id);
+
+        // Notify both users
+        const otherId = confirmer === "donor" ? data.claimed_by : data.donor_id;
+        if (otherId) {
+          await supabase.from("notifications").insert({
+            user_id: otherId,
+            type: "completed",
+            title: "Pickup Completed!",
+            message: `The food pickup for "${listing!.title}" has been completed successfully!`,
+            listing_id: id,
+          });
+        }
+
+        toast({
+          title: "Pickup Completed!",
+          description: "Both parties have confirmed. Thank you for reducing food waste!",
+        });
+      } else {
+        toast({
+          title: "Confirmation Recorded",
+          description: "Waiting for the other party to confirm pickup.",
+        });
+      }
+
+      fetchListing();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -298,9 +380,34 @@ const ListingDetail = () => {
 
                 <div className="flex items-center gap-3">
                   <MapPin className="h-5 w-5 text-muted-foreground" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm text-muted-foreground">Pickup Location</p>
                     <p className="font-medium">{listing.pickup_location}</p>
+                    {userLocation && listing.pickup_latitude && listing.pickup_longitude && (
+                      <div className="flex items-center gap-3 mt-2">
+                        <Badge variant="outline" className="gap-1">
+                          <Navigation className="h-3 w-3" />
+                          {formatDistance(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              listing.pickup_latitude,
+                              listing.pickup_longitude
+                            )
+                          )} away
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Est. {estimateTravelTime(
+                            calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              listing.pickup_latitude,
+                              listing.pickup_longitude
+                            )
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -381,6 +488,41 @@ const ListingDetail = () => {
                     <MessageCircle className="h-4 w-4 mr-2" />
                     Chat with Donor
                   </Button>
+                  
+                  {listing.status === "claimed" && !listing.pickup_confirmed_by_receiver && (
+                    <Card className="border-primary">
+                      <CardHeader>
+                        <CardTitle className="text-sm">Confirm Pickup</CardTitle>
+                        <CardDescription>
+                          {listing.pickup_confirmed_by_donor 
+                            ? "Donor has confirmed. Please confirm your pickup."
+                            : "Once you've received the food, confirm the pickup below."}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          className="w-full" 
+                          onClick={() => handleConfirmPickup("receiver")}
+                          disabled={claiming}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          {claiming ? "Confirming..." : "I've Received the Food"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {listing.status === "claimed" && listing.pickup_confirmed_by_receiver && !listing.pickup_confirmed_by_donor && (
+                    <Card className="border-border">
+                      <CardContent className="pt-6">
+                        <div className="text-center text-muted-foreground">
+                          <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-success" />
+                          <p className="text-sm">You've confirmed pickup. Waiting for donor's confirmation.</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {currentUserId && listing.status === "completed" && (
                     <RatingDialog
                       listingId={listing.id}
@@ -392,10 +534,46 @@ const ListingDetail = () => {
               )}
               
               {isDonor && isClaimed && (
-                <Button className="w-full" onClick={() => navigate(`/chat/${listing.claimed_by}`)}>
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Chat with Receiver
-                </Button>
+                <>
+                  <Button className="w-full" onClick={() => navigate(`/chat/${listing.claimed_by}`)}>
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Chat with Receiver
+                  </Button>
+
+                  {listing.status === "claimed" && !listing.pickup_confirmed_by_donor && (
+                    <Card className="border-primary">
+                      <CardHeader>
+                        <CardTitle className="text-sm">Confirm Handover</CardTitle>
+                        <CardDescription>
+                          {listing.pickup_confirmed_by_receiver 
+                            ? "Receiver has confirmed. Please confirm the handover."
+                            : "Once you've handed over the food, confirm below."}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          className="w-full" 
+                          onClick={() => handleConfirmPickup("donor")}
+                          disabled={claiming}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          {claiming ? "Confirming..." : "I've Given the Food"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {listing.status === "claimed" && listing.pickup_confirmed_by_donor && !listing.pickup_confirmed_by_receiver && (
+                    <Card className="border-border">
+                      <CardContent className="pt-6">
+                        <div className="text-center text-muted-foreground">
+                          <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-success" />
+                          <p className="text-sm">You've confirmed handover. Waiting for receiver's confirmation.</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
             </div>
           </CardContent>
